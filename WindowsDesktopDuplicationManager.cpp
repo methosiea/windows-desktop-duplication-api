@@ -215,7 +215,6 @@ void WindowsDesktopDuplicationManager::Update()
 	// Check if the desktop image has changed.
 	if (m_frameInfo.LastPresentTime.QuadPart != 0 && m_frameInfo.TotalMetadataBufferSize != 0)
 	{
-
 		OnDesktopImageChanged();
 	}
 
@@ -252,6 +251,7 @@ void WindowsDesktopDuplicationManager::Release()
 	ReleaseOutputDuplication();
 	ReleasePointerShapeBuffer();
 	ReleaseMetadataBuffer();
+	ReleaseBitmapDataBuffer();
 }
 
 void WindowsDesktopDuplicationManager::InitializeOutputDuplication()
