@@ -1,5 +1,6 @@
 #include "WindowsDesktopDuplicationManager.h"
 #include <cassert>
+#include <new>
 #ifdef _DEBUG
 #include <iostream>
 #endif
