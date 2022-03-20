@@ -82,6 +82,7 @@
     <ClCompile Include="WindowsDesktopDuplicationManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="macros.h" />
     <ClInclude Include="WindowsDesktopDuplicationManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
