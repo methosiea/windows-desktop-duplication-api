@@ -21,10 +21,15 @@ private:
 	ID3D11Device* m_pDevice = NULL;
 	ID3D11DeviceContext* m_pImmediateContext = NULL;
 	DXGI_OUTDUPL_FRAME_INFO m_frameInfo = {};
-	D3D11_MAPPED_SUBRESOURCE m_mappedResource = {};
+	IDXGIResource* m_pDesktopResource = NULL;
+
+	BYTE* m_pBitmapDataBuffer = NULL;
+	UINT m_iBitmapDataBufferSize = 0;
+	UINT m_iBitmapDataBufferSizeRequired = 0;
 
 	BYTE* m_pPointerShapeBuffer = NULL;
 	UINT m_iPointerShapeBufferSize = 0;
+	UINT m_iPointerShapeBufferSizeRequired = 0;
 	DXGI_OUTDUPL_POINTER_SHAPE_INFO m_pointerShapeInfo = {};
 
 	BYTE* m_pMetadataBuffer = NULL;
@@ -43,6 +48,7 @@ private:
 
 	void ReleasePointerShapeBuffer();
 	void ReleaseMetadataBuffer();
+	void ReleaseBitmapDataBuffer();
 
 	void OnPointerVisibilityChanged();
 	void OnPointerShapeChanged();
@@ -50,5 +56,6 @@ private:
 
 	void UpdatePointerShapeBuffer();
 	void UpdateMetadataBuffer();
+	void UpdateBitmapDataBuffer();
 };
 

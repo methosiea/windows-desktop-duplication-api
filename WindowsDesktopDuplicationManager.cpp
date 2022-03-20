@@ -132,8 +132,7 @@ WindowsDesktopDuplicationManager::WindowsDesktopDuplicationManager()
 void WindowsDesktopDuplicationManager::Update()
 {
 	assert(m_pOutputDuplication != NULL);
-
-	ID3D11Texture2D* pDesktopSurface = NULL;
+	assert(m_pDesktopResource == NULL);
 
 #ifdef _DEBUG
 	std::cout << "Acquires the next frame." << std::endl;
@@ -152,7 +151,7 @@ void WindowsDesktopDuplicationManager::Update()
 		// ppDesktopResource
 		// A pointer to a variable that receives the IDXGIResource interface of the surface that
 		// contains the desktop bitmap.
-		reinterpret_cast<IDXGIResource**>(&pDesktopSurface)
+		&m_pDesktopResource
 	);
 
 	// DXGI_ERROR_ACCESS_LOST
@@ -190,7 +189,7 @@ void WindowsDesktopDuplicationManager::Update()
 	}
 
 	// Check if the pointer visibility has changed.
-	const auto bPointerVisibility = m_frameInfo.PointerPosition.Visible;
+	const BOOL bPointerVisibility = m_frameInfo.PointerPosition.Visible;
 
 	if (bPointerVisibility != m_bLastPointerVisibility)
 	{
@@ -206,7 +205,7 @@ void WindowsDesktopDuplicationManager::Update()
 	// LastMouseUpdateTime; however, the application must check the value of
 	// the PointerShapeBufferSize member to determine whether the shape was
 	// updated too.
-	const auto iPointerShapeBufferSize = m_frameInfo.PointerShapeBufferSize;
+	const UINT iPointerShapeBufferSize = m_frameInfo.PointerShapeBufferSize;
 
 	if (bPointerVisibility && m_frameInfo.LastMouseUpdateTime.QuadPart != 0 && iPointerShapeBufferSize != 0)
 	{
@@ -216,14 +215,15 @@ void WindowsDesktopDuplicationManager::Update()
 	// Check if the desktop image has changed.
 	if (m_frameInfo.LastPresentTime.QuadPart != 0 && m_frameInfo.TotalMetadataBufferSize != 0)
 	{
+
 		OnDesktopImageChanged();
 	}
 
 	// Release current frame.
 	m_pOutputDuplication->ReleaseFrame();
 
-	pDesktopSurface->Release();
-	pDesktopSurface = NULL;
+	m_pDesktopResource->Release();
+	m_pDesktopResource = NULL;
 }
 
 void WindowsDesktopDuplicationManager::Release()
@@ -291,6 +291,7 @@ void WindowsDesktopDuplicationManager::ReleasePointerShapeBuffer()
 	}
 
 	m_iPointerShapeBufferSize = 0;
+	m_iPointerShapeBufferSizeRequired = 0;
 }
 
 void WindowsDesktopDuplicationManager::ReleaseMetadataBuffer()
@@ -308,6 +309,18 @@ void WindowsDesktopDuplicationManager::ReleaseMetadataBuffer()
 
 	m_pMoveRectsBegin = NULL;
 	m_iMoveRectsCount = 0;
+}
+
+void WindowsDesktopDuplicationManager::ReleaseBitmapDataBuffer()
+{
+	if (m_pBitmapDataBuffer != NULL)
+	{
+		delete[] m_pBitmapDataBuffer;
+		m_pBitmapDataBuffer = NULL;
+	}
+
+	m_iBitmapDataBufferSize = 0;
+	m_iBitmapDataBufferSizeRequired = 0;
 }
 
 void WindowsDesktopDuplicationManager::OnPointerVisibilityChanged()
@@ -333,6 +346,7 @@ void WindowsDesktopDuplicationManager::OnDesktopImageChanged()
 #endif
 
 	UpdateMetadataBuffer();
+	UpdateBitmapDataBuffer();
 
 #ifdef _DEBUG
 	std::cout << "Number of moved rects: " << m_iMoveRectsCount << std::endl;
@@ -370,7 +384,7 @@ void WindowsDesktopDuplicationManager::OnDesktopImageChanged()
 
 void WindowsDesktopDuplicationManager::UpdatePointerShapeBuffer()
 {
-	const auto iPointerShapeBufferSize = m_frameInfo.PointerShapeBufferSize;
+	const UINT iPointerShapeBufferSize = m_frameInfo.PointerShapeBufferSize;
 
 	assert(iPointerShapeBufferSize > 0);
 
@@ -381,6 +395,7 @@ void WindowsDesktopDuplicationManager::UpdatePointerShapeBuffer()
 
 		m_pPointerShapeBuffer = new (std::nothrow) BYTE[iPointerShapeBufferSize];
 		m_iPointerShapeBufferSize = iPointerShapeBufferSize;
+		m_iPointerShapeBufferSizeRequired = iPointerShapeBufferSize;
 
 		assert(("Failed to allocate memory for m_pPointerShapeBuffer.", m_pPointerShapeBuffer != NULL));
 
@@ -402,7 +417,7 @@ void WindowsDesktopDuplicationManager::UpdatePointerShapeBuffer()
 		m_pOutputDuplication->GetFramePointerShape(
 			m_iPointerShapeBufferSize,
 			m_pPointerShapeBuffer,
-			&m_iPointerShapeBufferSize,
+			&m_iPointerShapeBufferSizeRequired,
 			&m_pointerShapeInfo
 		),
 		"Failed to get move rects."
@@ -411,7 +426,7 @@ void WindowsDesktopDuplicationManager::UpdatePointerShapeBuffer()
 
 void WindowsDesktopDuplicationManager::UpdateMetadataBuffer()
 {
-	const auto iMetadataBufferSize = m_frameInfo.TotalMetadataBufferSize;
+	const UINT iMetadataBufferSize = m_frameInfo.TotalMetadataBufferSize;
 
 	assert(iMetadataBufferSize > 0);
 
@@ -423,12 +438,12 @@ void WindowsDesktopDuplicationManager::UpdateMetadataBuffer()
 		m_pMetadataBuffer = new (std::nothrow) BYTE[iMetadataBufferSize];
 		m_iMetadataBufferSize = iMetadataBufferSize;
 
-		assert(("Failed to allocate memory for m_byMetadataBuffer.", m_pMetadataBuffer != NULL));
+		assert(("Failed to allocate memory for m_pMetadataBuffer.", m_pMetadataBuffer != NULL));
 
 		if (m_pMetadataBuffer == NULL)
 		{
 #ifdef _DEBUG
-			std::cout << "m_byMetadataBuffer gets cleared." << std::endl;
+			std::cout << "m_byMetadataBuffer gets released." << std::endl;
 #endif
 
 			ReleaseMetadataBuffer();
@@ -463,6 +478,107 @@ void WindowsDesktopDuplicationManager::UpdateMetadataBuffer()
 	m_iDirtyRectsCount = iDirtyRectsBufferSize / sizeof(RECT);
 }
 
+void WindowsDesktopDuplicationManager::UpdateBitmapDataBuffer()
+{
+	assert(m_pDesktopResource != NULL);
+
+	ID3D11Texture2D* immutableTexture = NULL;
+	ID3D11Texture2D* stagableTexture = NULL;
+
+	ASSERT_SUCCEEDED(
+		m_pDesktopResource->QueryInterface(IID_PPV_ARGS(&immutableTexture)),
+		"Failed to query ID3D11Texture2D from IDXGIResource."
+	);
+
+	D3D11_TEXTURE2D_DESC desc;
+	immutableTexture->GetDesc(&desc);
+	// Value that identifies how the texture is to be read from and written to. The most common
+	// value is D3D11_USAGE_DEFAULT; see D3D11_USAGE for all possible values.
+	desc.Usage = D3D11_USAGE_STAGING;
+	// Flags(see D3D11_BIND_FLAG) for binding to pipeline stages. The flags can be combined
+	// by a bitwise OR.
+	desc.BindFlags = 0;
+	// Flags (see D3D11_CPU_ACCESS_FLAG) to specify the types of CPU access allowed. Use 0 if
+	// CPU access is not required. These flags can be combined with a bitwise OR.
+	desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+	// Flags (see D3D11_RESOURCE_MISC_FLAG) that identify other, less common resource
+	// options. Use 0 if none of these flags apply. These flags can be combined by using a bitwise
+	// OR. For a texture cube-map, set the D3D11_RESOURCE_MISC_TEXTURECUBE flag. Cube-map
+	// arrays (that is, ArraySize > 6) require feature level D3D_FEATURE_LEVEL_10_1 or higher.
+	desc.MiscFlags = 0;
+
+	ASSERT_SUCCEEDED(
+		m_pDevice->CreateTexture2D(&desc, NULL, &stagableTexture),
+		"Failed to create a new texture."
+	);
+
+	m_pImmediateContext->CopyResource(stagableTexture, immutableTexture);
+
+	D3D11_MAPPED_SUBRESOURCE subresource;
+	ASSERT_SUCCEEDED(
+		m_pImmediateContext->Map(
+			stagableTexture,
+			0,
+			D3D11_MAP_READ_WRITE,
+			0,
+			&subresource
+		),
+		"Failed to map texture to subresource."
+	);
+
+	const UINT iDstRowPitch = desc.Width * 4;
+	const UINT iDstRowCount = desc.Height;
+	const UINT iBitmapDataBufferSize = iDstRowPitch * iDstRowCount;
+
+	// Check if the current buffer is to small.
+	if (iBitmapDataBufferSize > m_iBitmapDataBufferSize)
+	{
+		ReleaseBitmapDataBuffer();
+
+		m_pBitmapDataBuffer = new (std::nothrow) BYTE[iBitmapDataBufferSize];
+		m_iBitmapDataBufferSize = iBitmapDataBufferSize;
+		m_iBitmapDataBufferSizeRequired = iBitmapDataBufferSize;
+
+		assert(("Failed to allocate memory for m_pBitmapDataBuffer.", m_pBitmapDataBuffer != NULL));
+
+		if (m_pBitmapDataBuffer == NULL)
+		{
+#ifdef _DEBUG
+			std::cout << "m_pBitmapDataBuffer gets released." << std::endl;
+#endif
+
+			ReleaseMetadataBuffer();
+
+			return;
+		}
+	}
+	else
+	{
+		m_iBitmapDataBufferSizeRequired = iBitmapDataBufferSize;
+	}
+
+	BYTE* pSrcBegin = reinterpret_cast<BYTE*>(subresource.pData);
+	BYTE* pDstBegin = m_pBitmapDataBuffer;
+	const UINT iSrcRowPitch = subresource.RowPitch;
+
+	assert(iDstRowPitch < iSrcRowPitch);
+
+	for (UINT i = 0; i < iDstRowCount; ++i)
+	{
+		memcpy(pDstBegin, pSrcBegin, iDstRowPitch);
+		pDstBegin += iDstRowPitch;
+		pSrcBegin += iSrcRowPitch;
+	}
+
+	m_pImmediateContext->Unmap(stagableTexture, 0);
+
+	immutableTexture->Release();
+	immutableTexture = NULL;
+
+	stagableTexture->Release();
+	stagableTexture = NULL;
+}
+
 WindowsDesktopDuplicationManager::~WindowsDesktopDuplicationManager()
 {
 	assert(m_pFactory == NULL);
@@ -471,8 +587,18 @@ WindowsDesktopDuplicationManager::~WindowsDesktopDuplicationManager()
 	assert(m_pOutputDuplication == NULL);
 	assert(m_pDevice == NULL);
 	assert(m_pImmediateContext == NULL);
-	assert(m_pPointerShapeBuffer == NULL && m_iPointerShapeBufferSize == 0);
+	assert(m_pDesktopResource == NULL);
+	assert(
+		m_pPointerShapeBuffer == NULL &&
+		m_iPointerShapeBufferSize == 0 &&
+		m_iPointerShapeBufferSizeRequired == 0
+	);
 	assert(m_pMetadataBuffer == NULL && m_iMetadataBufferSize == 0);
 	assert(m_pMoveRectsBegin == NULL && m_iMoveRectsCount == 0);
 	assert(m_pDirtyRectsBegin == NULL && m_iDirtyRectsCount == 0);
+	assert(
+		m_pBitmapDataBuffer == NULL &&
+		m_iBitmapDataBufferSize == 0 &&
+		m_iBitmapDataBufferSizeRequired == 0
+	);
 }
