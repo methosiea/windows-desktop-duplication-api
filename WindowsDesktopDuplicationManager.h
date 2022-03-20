@@ -36,6 +36,8 @@ private:
 	RECT* m_pDirtyRectsBegin = NULL;
 	UINT m_iDirtyRectsCount = 0;
 
+	BOOL m_bLastPointerVisibility = TRUE;
+
 	void InitializeOutputDuplication();
 	void ReleaseOutputDuplication();
 

@@ -190,11 +190,11 @@ void WindowsDesktopDuplicationManager::Update()
 	}
 
 	// Check if the pointer visibility has changed.
-	static auto bLastVisibility = TRUE;
-	const auto bVisibility = m_frameInfo.PointerPosition.Visible;
+	const auto bPointerVisibility = m_frameInfo.PointerPosition.Visible;
 
-	if (bVisibility != bLastVisibility)
+	if (bPointerVisibility != m_bLastPointerVisibility)
 	{
+		m_bLastPointerVisibility = bPointerVisibility;
 		OnPointerVisibilityChanged();
 	}
 
@@ -208,7 +208,7 @@ void WindowsDesktopDuplicationManager::Update()
 	// updated too.
 	const auto iPointerShapeBufferSize = m_frameInfo.PointerShapeBufferSize;
 
-	if (bVisibility && m_frameInfo.LastMouseUpdateTime.QuadPart != 0 && iPointerShapeBufferSize != 0)
+	if (bPointerVisibility && m_frameInfo.LastMouseUpdateTime.QuadPart != 0 && iPointerShapeBufferSize != 0)
 	{
 		OnPointerShapeChanged();
 	}
