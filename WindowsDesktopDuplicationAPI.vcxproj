@@ -79,6 +79,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="WindowsDesktopDuplicationAPI.cpp" />
+    <ClCompile Include="WindowsDesktopDuplicationManager.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="WindowsDesktopDuplicationManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
